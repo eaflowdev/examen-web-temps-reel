@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notifications WebSocket</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f2f5;
+      padding: 30px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    #status {
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    #status span {
+      font-weight: bold;
+    }
+
+    #status.connected span { color: #28a745; }
+    #status.disconnected span { color: #dc3545; }
+
+    #notifications {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 700px;
+    }
+
+    .notification {
+      padding: 14px 18px;
+      border-radius: 8px;
+      border-left: 6px solid;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    .notification .meta {
+      font-size: 0.75rem;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .notification .text {
+      font-size: 1rem;
+      color: #333;
+    }
+
+    /* info → bleu */
+    .notification.info {
+      border-color: #1a73e8;
+    }
+    .notification.info .meta { color: #1a73e8; }
+
+    /* warning → orange */
+    .notification.warning {
+      border-color: #f5a623;
+    }
+    .notification.warning .meta { color: #f5a623; }
+
+    /* critical → rouge */
+    .notification.critical {
+      border-color: #e53935;
+    }
+    .notification.critical .meta { color: #e53935; }
+  </style>
+</head>
+<body>
+
+  <h1>Notifications en temps réel</h1>
+  <p id="status" class="disconnected">Statut : <span>Déconnecté</span></p>
+
+  <div id="notifications"></div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const statusSpan = statusEl.querySelector('span');
+    const container = document.getElementById('notifications');
+
+    const ws = new WebSocket('ws://localhost:3000');
+
+    ws.addEventListener('open', () => {
+      statusEl.className = 'connected';
+      statusSpan.textContent = 'Connecté';
+    });
+
+    ws.addEventListener('close', () => {
+      statusEl.className = 'disconnected';
+      statusSpan.textContent = 'Déconnecté';
+    });
+
+    ws.addEventListener('error', () => {
+      statusEl.className = 'disconnected';
+      statusSpan.textContent = 'Erreur de connexion';
+    });
+
+    ws.addEventListener('message', (event) => {
+      let data;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        console.error('Message non JSON :', event.data);
+        return;
+      }
+
+      // Historique initial envoyé à la connexion
+      if (data.type === 'history') {
+        data.notifications.forEach(addNotification);
+        return;
+      }
+
+      addNotification(data);
+    });
+
+    function addNotification({ type, message }) {
+      const allowed = ['info', 'warning', 'critical'];
+      const safeType = allowed.includes(type) ? type : 'info';
+
+      const notif = document.createElement('div');
+      notif.className = `notification ${safeType}`;
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = safeType;
+
+      const text = document.createElement('div');
+      text.className = 'text';
+      text.textContent = message;
+
+      notif.appendChild(meta);
+      notif.appendChild(text);
+      container.prepend(notif);
+    }
+  </script>
+
+</body>
+</html>
